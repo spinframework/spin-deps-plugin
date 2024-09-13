@@ -1,0 +1,5 @@
+name = "cdeps"
+version = "0.1.0"
+spin_compatibility = ">=2.7"
+license = "Apache-2.0"
+package = "./target/release/cdeps"
