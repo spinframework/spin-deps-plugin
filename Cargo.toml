@@ -6,11 +6,15 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.87"
 clap = { version = "4.5.17", features = ["derive"] }
+dialoguer = "0.11.0"
+reqwest = "0.12.7"
+sha2 = "0.10.8"
+spin-manifest = { path = "/Users/karthik_ganeshram/Work/fermyon/spin/crates/manifest" }
+spin-serde = { path = "/Users/karthik_ganeshram/Work/fermyon/spin/crates/serde" }
 tokio = { version = "1.40.0", features = ["full"] }
-wasmparser = "0.217.0"
-wit-parser = "0.217.0"
-wat = "1.217.0"
-wit-component = "0.217.0"
-wit-bindgen-rust = "0.32.0"
-wit-bindgen-core = "0.32.0"
+toml = "0.8.19"
+toml_edit = "0.22.21"
 url = "2.5.2"
+wasmparser = { git = "https://github.com/bytecodealliance/wasm-tools" }
+wit-component = { git = "https://github.com/bytecodealliance/wasm-tools" }
+wit-parser = { git = "https://github.com/bytecodealliance/wasm-tools" }
