@@ -5,7 +5,7 @@ This plugin enables adding component dependencies to a [Spin](https://github.com
 ## Installation
 
 ```bash
-spin plugins install --url https://github.com/karthik2804/spin-deps/releases/download/canary/spin-deps.json -y
+spin plugins install --url https://github.com/fermyon/spin-deps/releases/download/canary/spin-deps.json -y
 ```
 
 ## Using the plugin
