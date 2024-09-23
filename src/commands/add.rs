@@ -103,7 +103,7 @@ impl AddCommand {
         for (package_name, interface) in exported_interfaces {
             package_interface_map
                 .entry(package_name)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(interface);
         }
 
@@ -212,11 +212,7 @@ impl AddCommand {
             },
             AddCommand::Registry(src) => ComponentDependency::Package {
                 version: src.version.to_string(),
-                registry: if let Some(registry) = &src.registry {
-                    Some(registry.to_string())
-                } else {
-                    None
-                },
+                registry: src.registry.as_ref().map(|registry| registry.to_string()),
                 package: Some(src.package.clone().to_string()),
                 export: None,
             },

@@ -19,7 +19,7 @@ permissions:
 concurrency: ${{ github.workflow }}
 
 env:
-  PROGRAM_NAME: deps
+  PROGRAM_NAME: spin-deps
 
 jobs:
   lint:
@@ -82,8 +82,10 @@ jobs:
         run: |
           sudo apt update
           sudo apt install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-          echo '[target.aarch64-unknown-linux-gnu]' >> ${HOME}/.cargo/config.toml
-          echo 'linker = "aarch64-linux-gnu-gcc"' >> ${HOME}/.cargo/config.toml
+          if ! grep -q "\[target.aarch64-unknown-linux-gnu\]" ${HOME}/.cargo/config.toml; then
+            echo '[target.aarch64-unknown-linux-gnu]' >> ${HOME}/.cargo/config.toml
+            echo 'linker = "aarch64-linux-gnu-gcc"' >> ${HOME}/.cargo/config.toml
+          fi
       - name: Build plugin binary
         run: cargo build --release --target ${{ matrix.config.target }} ${{ matrix.config.extraArg }}
       - name: Copy plugin binary to standard location
