@@ -297,7 +297,7 @@ async fn edit_component_deps_in_manifest(
             } => {
                 let mut http_table = toml_edit::InlineTable::default();
                 http_table.get_or_insert("url", url);
-                http_table.get_or_insert("sha256", digest);
+                http_table.get_or_insert("digest", digest);
                 toml_edit::Value::InlineTable(http_table)
             }
         };
