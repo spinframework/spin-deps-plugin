@@ -4,15 +4,19 @@ use clap::{Parser, Subcommand};
 mod commands;
 use commands::add::AddCommand;
 
+/// Main CLI structure for command-line argument parsing.
 #[derive(Parser)]
 #[command(version)]
 struct Cli {
     #[command(subcommand)]
+    /// The command to execute, which can be a subcommand.
     command: Commands,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 enum Commands {
+    /// Add a new component dependency
+    #[command(subcommand)]
     Add(AddCommand),
 }
 

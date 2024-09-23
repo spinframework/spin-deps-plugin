@@ -1,0 +1,14 @@
+{
+  "name": "deps",
+  "version": "0.1.0",
+  "spinCompatibility": ">=2.7",
+  "license": "Apache-2.0",
+  "packages": [
+    {
+      "os": "macos",
+      "arch": "aarch64",
+      "url": "file:///Users/karthik_ganeshram/Work/fermyon/plugins/cdeps/deps-0.1.0-macos-aarch64.tar.gz",
+      "sha256": "affc27ed477336c8588ee1327ba394320e990ea4b3969a6e9ae113ffd3e86a4e"
+    }
+  ]
+}
