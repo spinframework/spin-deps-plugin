@@ -1,0 +1,21 @@
+spin_manifest_version = 2
+
+[application]
+name = "example"
+version = "0.1.0"
+authors = ["Brian H <brian.hardock@fermyon.com>"]
+description = ""
+
+[[trigger.http]]
+route = "/..."
+component = "example"
+
+[component.example]
+source = "target/wasm32-wasi/release/example.wasm"
+allowed_outbound_hosts = []
+[component.example.build]
+command = "cargo build --target wasm32-wasi --release"
+watch = ["src/**/*.rs", "Cargo.toml"]
+
+[component.example.dependencies]
+"component:markdown-renderer/markdown-fns" = { version = "^0.1.0", registry = "registry-by-karthik.fermyon.app", package = "component:markdown-renderer" }
