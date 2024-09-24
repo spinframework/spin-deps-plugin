@@ -34,7 +34,7 @@ pub enum AddCommand {
 
 impl AddCommand {
     pub async fn run(&self) -> Result<()> {
-        let (component, component_name) = match self {
+        let component = match self {
             AddCommand::Local(cmd) => cmd.get_component().await?,
             AddCommand::Http(cmd) => cmd.get_component().await?,
             AddCommand::Registry(cmd) => cmd.get_component().await?,
@@ -53,11 +53,10 @@ impl AddCommand {
 
         resolve.importize(
             resolve.select_world(main, None)?,
-            Some(component_name.clone()),
+            Some("dependency-world".to_string()),
         )?;
-        let wit_content = self.generate_wit(&resolve, main)?;
 
-        self.write_wit_to_file(&component_name, &wit_content)
+        self.write_wit_to_file(&resolve, main, &selected_component)
             .await?;
         self.update_manifest(&mut manifest, &selected_component, selected_interfaces)
             .await?;
@@ -174,18 +173,38 @@ impl AddCommand {
             .collect()
     }
 
-    /// Generates WIT content from the resolved package.
-    fn generate_wit(&self, resolve: &Resolve, main: PackageId) -> Result<String> {
-        resolve_to_wit(resolve, main)
-    }
-
     /// Writes the WIT content to the specified file.
-    async fn write_wit_to_file(&self, component_name: &str, wit_content: &str) -> Result<()> {
+    async fn write_wit_to_file(
+        &self,
+        dep_resolve: &Resolve,
+        dep_pkg_id: PackageId,
+        selected_component: &str,
+    ) -> Result<()> {
+        const SPIN_DEPS_WIT_FILE_NAME: &str = "deps.wit";
+
         let component_dir = PathBuf::from(SPIN_WIT_DIRECTORY)
             .join(SPIN_COMPONENTS_WIT_DIRECTORY)
-            .join(component_name);
-        fs::create_dir_all(&component_dir).await?;
-        fs::write(component_dir.join("main.wit"), wit_content).await?;
+            .join(selected_component);
+
+        let output_wit = component_dir.join(SPIN_DEPS_WIT_FILE_NAME);
+        let mut resolve = Resolve::default();
+
+        let deps_package_id = if std::fs::exists(&output_wit)? {
+            resolve.push_file(&output_wit)?
+        } else {
+            fs::create_dir_all(&component_dir).await?;
+            resolve.push_str("component.wit", DEFAULT_WIT)?
+        };
+
+        let deps_world_id = resolve.select_world(deps_package_id, Some("deps"))?;
+        let dep_main_world_id = dep_resolve.select_world(dep_pkg_id, Some("dependency-world"))?;
+        let remap = resolve.merge(dep_resolve.clone())?;
+        let dependecy_world_id = remap.map_world(dep_main_world_id, None)?;
+        resolve.merge_worlds(dependecy_world_id, deps_world_id)?;
+
+        let wit_content = resolve_to_wit(&resolve, deps_package_id)?;
+
+        fs::write(output_wit, wit_content).await?;
 
         Ok(())
     }
@@ -318,3 +337,9 @@ fn get_spin_manifest_path() -> Result<PathBuf> {
     }
     Ok(manifest_path)
 }
+
+const DEFAULT_WIT: &str = r#"package spin-deps:deps@0.1.0;
+
+        world deps {
+        }
+"#;

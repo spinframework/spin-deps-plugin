@@ -14,21 +14,14 @@ pub struct HttpAddCommand {
     /// The digest for verifying the integrity of the component. The digest must be a SHA-256 hash.
     #[clap(short, long)]
     pub digest: String,
-    /// name for the component being added.
-    #[clap(short, long)]
-    pub name: String,
 }
 
 impl HttpAddCommand {
-    pub async fn get_component(&self) -> Result<(Vec<u8>, String)> {
+    pub async fn get_component(&self) -> Result<Vec<u8>> {
         let cache = Cache::new(None).await?;
         let digest = format!("sha256:{}", &self.digest);
-        let name = &self.name;
         if let Ok(path) = cache.wasm_file(&digest) {
-            return Ok((
-                fs::read(path).await.map_err(|e| anyhow!(e))?,
-                name.to_string(),
-            ));
+            return fs::read(path).await.map_err(|e| anyhow!(e));
         }
 
         let client = Client::new();
@@ -49,6 +42,6 @@ impl HttpAddCommand {
         let dest = cache.wasm_path(digest);
         fs::write(dest, &bytes).await?;
 
-        Ok((bytes.to_vec(), name.to_string()))
+        Ok(bytes.to_vec())
     }
 }

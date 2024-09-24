@@ -20,8 +20,7 @@ pub struct RegistryAddCommand {
 }
 
 impl RegistryAddCommand {
-    pub async fn get_component(&self) -> Result<(Vec<u8>, String)> {
-        let name = format!("{}_{}", self.package.namespace(), self.package.name());
+    pub async fn get_component(&self) -> Result<Vec<u8>> {
         let mut client_config = wasm_pkg_loader::Config::global_defaults()?;
 
         if let Some(registry) = &self.registry {
@@ -79,6 +78,6 @@ impl RegistryAddCommand {
             dest
         };
 
-        Ok((tokio::fs::read(path).await?, name))
+        Ok(tokio::fs::read(path).await?)
     }
 }
