@@ -13,7 +13,7 @@ use tokio::fs;
 use wit_parser::{PackageId, Resolve};
 
 use crate::common::{
-    constants::{SPIN_COMPONENTS_WIT_DIRECTORY, SPIN_DEPS_WIT_FILE_NAME, SPIN_WIT_DIRECTORY},
+    constants::{SPIN_DEPS_WIT_FILE_NAME, SPIN_WIT_DIRECTORY},
     interact::{select_multiple_prompt, select_prompt},
     manifest::{edit_component_deps_in_manifest, get_component_ids, get_spin_manifest_path},
     wit::{
@@ -61,15 +61,14 @@ impl AddCommand {
             Some("dependency-world".to_string()),
         )?;
 
-        let component_dir = PathBuf::from(SPIN_WIT_DIRECTORY)
-            .join(SPIN_COMPONENTS_WIT_DIRECTORY)
-            .join(selected_component);
+        let component_dir = PathBuf::from(SPIN_WIT_DIRECTORY).join(selected_component);
 
         let output_wit = component_dir.join(SPIN_DEPS_WIT_FILE_NAME);
 
         let base_resolve_file = if std::fs::exists(&output_wit)? {
             Some(&output_wit)
         } else {
+            fs::create_dir_all(&component_dir).await?;
             None
         };
 

@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 
 mod commands;
 mod common;
-use commands::{add::AddCommand, bindings::BindingsCommand};
+use commands::{add::AddCommand, bindings::GenerateBindingsCommand};
 
 /// Main CLI structure for command-line argument parsing.
 #[derive(Parser)]
@@ -20,7 +20,7 @@ enum Commands {
     #[command(subcommand)]
     Add(AddCommand),
     /// Generates dependency bindings for selected component
-    Bindings(BindingsCommand),
+    GenerateBindings(GenerateBindingsCommand),
 }
 
 #[tokio::main]
@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
 
     match app.command {
         Commands::Add(cmd) => cmd.run().await?,
-        Commands::Bindings(cmd) => cmd.run().await?,
+        Commands::GenerateBindings(cmd) => cmd.run().await?,
     }
 
     Ok(())
