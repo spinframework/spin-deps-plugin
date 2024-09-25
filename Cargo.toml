@@ -19,11 +19,12 @@ url = "2.5.2"
 wasmparser = { git = "https://github.com/bytecodealliance/wasm-tools" }
 wit-component = { git = "https://github.com/bytecodealliance/wasm-tools" }
 wit-parser = { git = "https://github.com/bytecodealliance/wasm-tools" }
-wasm-pkg-loader = "0.4.1"
 futures = "0.3.30"
 semver = "1.0.23"
 wit-bindgen-rust = { git = "https://github.com/fibonacci1729/wit-bindgen", branch = "deps" }
 wit-bindgen-core = { git = "https://github.com/fibonacci1729/wit-bindgen", branch = "deps" }
+wasm-pkg-common = "0.5.1"
+wasm-pkg-client = "0.5.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # This needs to be an explicit dependency to enable

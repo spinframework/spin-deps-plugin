@@ -1,8 +1,9 @@
-use anyhow::Result;
-use clap::Subcommand;
+use anyhow::{bail, Result};
+use clap::Args;
 use http::HttpAddCommand;
 use local::LocalAddCommand;
 use registry::RegistryAddCommand;
+use semver::VersionReq;
 use spin_manifest::{
     manifest_from_file,
     schema::v2::{AppManifest, ComponentDependency},
@@ -10,6 +11,8 @@ use spin_manifest::{
 use spin_serde::{DependencyName, DependencyPackageName, KebabId};
 use std::{collections::HashMap, path::PathBuf};
 use tokio::fs;
+use url::Url;
+use wasm_pkg_client::{PackageRef, Registry};
 use wit_parser::{PackageId, Resolve};
 
 use crate::common::{
@@ -25,23 +28,71 @@ mod http;
 mod local;
 mod registry;
 
-#[derive(Subcommand, Debug)]
-pub enum AddCommand {
-    /// Add a component from a local file.
+#[derive(Args, Debug)]
+pub struct AddCommand {
+    /// Source to the component. Can be one of a local path, a HTTP URL or a registry reference.
+    pub source: String,
+    /// Sha256 digest that will be used to verify HTTP downloads. Required for HTTP sources, ignored otherwise.
+    #[clap(short, long)]
+    pub digest: Option<String>,
+    /// Registry to override the default with. Ignored in the cases of local or HTTP sources.
+    #[clap(short, long)]
+    pub registry: Option<Registry>,
+}
+
+enum ComponentSource {
     Local(LocalAddCommand),
-    /// Add a component from an HTTP source.
     Http(HttpAddCommand),
-    /// Add a component from a registry.
     Registry(RegistryAddCommand),
+}
+
+impl ComponentSource {
+    pub fn infer_source(
+        source: &String,
+        digest: &Option<String>,
+        registry: &Option<Registry>,
+    ) -> Result<Self> {
+        let path = PathBuf::from(&source);
+        if path.exists() {
+            return Ok(Self::Local(LocalAddCommand { path }));
+        }
+
+        if let Ok(url) = Url::parse(source) {
+            if url.scheme().starts_with("http") {
+                return digest.clone().map_or_else(
+                    || bail!("Digest needs to be specified for HTTP sources."),
+                    |d| Ok(Self::Http(HttpAddCommand { url, digest: d })),
+                );
+            }
+        }
+
+        if let Ok((name, version)) = package_name_ver(source) {
+            if version.is_none() {
+                bail!("Version needs to specified for regitry sources.")
+            }
+            return Ok(Self::Registry(RegistryAddCommand {
+                package: name,
+                version: version.unwrap(),
+                registry: registry.clone(),
+            }));
+        }
+
+        bail!("Could not infer component source");
+    }
+    pub async fn get_component(&self) -> Result<Vec<u8>> {
+        match &self {
+            ComponentSource::Local(cmd) => cmd.get_component().await,
+            ComponentSource::Http(cmd) => cmd.get_component().await,
+            ComponentSource::Registry(cmd) => cmd.get_component().await,
+        }
+    }
 }
 
 impl AddCommand {
     pub async fn run(&self) -> Result<()> {
-        let component = match self {
-            AddCommand::Local(cmd) => cmd.get_component().await?,
-            AddCommand::Http(cmd) => cmd.get_component().await?,
-            AddCommand::Registry(cmd) => cmd.get_component().await?,
-        };
+        let source = ComponentSource::infer_source(&self.source, &self.digest, &self.registry)?;
+
+        let component = source.get_component().await?;
 
         let (mut resolve, main) = parse_component_bytes(component)?;
 
@@ -76,8 +127,13 @@ impl AddCommand {
         let wit_text = resolve_to_wit(&merged_resolve, main)?;
         fs::write(output_wit, wit_text).await?;
 
-        self.update_manifest(&mut manifest, selected_component, selected_interfaces)
-            .await?;
+        self.update_manifest(
+            source,
+            &mut manifest,
+            selected_component,
+            selected_interfaces,
+        )
+        .await?;
 
         Ok(())
     }
@@ -143,6 +199,7 @@ impl AddCommand {
     /// Updates the manifest file with the new component dependency.
     async fn update_manifest(
         &self,
+        source: ComponentSource,
         manifest: &mut AppManifest,
         selected_component: &str,
         selected_interfaces: Vec<String>,
@@ -150,17 +207,17 @@ impl AddCommand {
         let id = KebabId::try_from(selected_component.to_owned()).unwrap();
         let component = manifest.components.get_mut(&id).unwrap();
 
-        let component_dependency = match self {
-            AddCommand::Local(src) => ComponentDependency::Local {
+        let component_dependency = match source {
+            ComponentSource::Local(src) => ComponentDependency::Local {
                 path: src.path.clone(),
                 export: None,
             },
-            AddCommand::Http(src) => ComponentDependency::HTTP {
+            ComponentSource::Http(src) => ComponentDependency::HTTP {
                 url: src.url.to_string(),
                 digest: format!("sha256:{}", src.digest.clone()),
                 export: None,
             },
-            AddCommand::Registry(src) => ComponentDependency::Package {
+            ComponentSource::Registry(src) => ComponentDependency::Package {
                 version: src.version.to_string(),
                 registry: src.registry.as_ref().map(|registry| registry.to_string()),
                 package: Some(src.package.clone().to_string()),
@@ -183,4 +240,18 @@ impl AddCommand {
 
         Ok(())
     }
+}
+
+fn package_name_ver(package_name: &str) -> Result<(PackageRef, Option<VersionReq>)> {
+    let (package, version) = package_name
+        .split_once('@')
+        .map(|(pkg, ver)| (pkg, Some(ver)))
+        .unwrap_or((package_name, None));
+
+    let version = if let Some(v) = version {
+        Some(v.parse()?)
+    } else {
+        None
+    };
+    Ok((package.parse()?, version))
 }

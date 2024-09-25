@@ -17,7 +17,6 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Add a new component dependency
-    #[command(subcommand)]
     Add(AddCommand),
     /// Generates dependency bindings for selected component
     GenerateBindings(GenerateBindingsCommand),

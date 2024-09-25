@@ -1,10 +1,10 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use clap::Args;
 use futures::stream::StreamExt;
 use semver::VersionReq;
 use spin_loader::cache::Cache;
 use tokio::io::AsyncWriteExt;
-use wasm_pkg_loader::{PackageRef, Registry};
+use wasm_pkg_common::{package::PackageRef, registry::Registry};
 
 /// Command to add a component from a registry.
 #[derive(Args, Debug)]
@@ -21,21 +21,15 @@ pub struct RegistryAddCommand {
 
 impl RegistryAddCommand {
     pub async fn get_component(&self) -> Result<Vec<u8>> {
-        let mut client_config = wasm_pkg_loader::Config::global_defaults()?;
+        let mut client_config = wasm_pkg_client::Config::global_defaults()?;
 
         if let Some(registry) = &self.registry {
             client_config.set_package_registry_override(self.package.clone(), registry.to_owned());
         }
 
-        let mut pkg_loader = wasm_pkg_loader::Client::new(client_config);
+        let pkg_loader = wasm_pkg_client::Client::new(client_config);
 
-        let mut releases = pkg_loader.list_all_versions(&self.package).await.map_err(|e| {
-            if matches!(e, wasm_pkg_loader::Error::NoRegistryForNamespace(_)) && self.registry.to_owned().is_none() {
-                anyhow!("No default registry specified for wasm-pkg-loader. Create a default config, or set `registry` for package {:?}", &self.package)
-            } else {
-                e.into()
-            }
-        })?;
+        let mut releases = pkg_loader.list_all_versions(&self.package).await?;
 
         releases.sort();
 
@@ -55,7 +49,7 @@ impl RegistryAddCommand {
             .await?;
 
         let digest = match &release.content_digest {
-            wasm_pkg_loader::ContentDigest::Sha256 { hex } => format!("sha256:{hex}"),
+            wasm_pkg_client::ContentDigest::Sha256 { hex } => format!("sha256:{hex}"),
         };
 
         let cache = Cache::new(None).await?;
