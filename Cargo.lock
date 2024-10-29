@@ -4257,6 +4257,8 @@ dependencies = [
  "openssl",
  "reqwest 0.12.7",
  "semver",
+ "serde 1.0.210",
+ "serde_json",
  "sha2",
  "spin-loader",
  "spin-manifest",
