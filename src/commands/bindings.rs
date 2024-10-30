@@ -80,6 +80,7 @@ impl GenerateBindingsCommand {
                 }
 
                 fs::write(self.output.join("mod.rs"), mod_output).await?;
+                println!("Bindings generated for Rust in {0}. You need to add the `wit-bindgen` crate to your Rust Spin app - e.g., `cargo add wit-bindgen`", self.output.to_str().expect("Failed to parse output path"));
             }
             BindingsLanguage::Ts => {
                 todo!("generate ts")
