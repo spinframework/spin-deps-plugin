@@ -14,10 +14,15 @@ pub enum BindingsLanguage {
 
 #[derive(Args, Debug)]
 pub struct GenerateBindingsCommand {
+    /// The programming language to generate bindings in
     #[clap(short = 'L', long)]
     pub language: BindingsLanguage,
+
+    /// Output directory
     #[clap(short = 'o', long)]
     pub output: PathBuf,
+
+    /// Id of the component, which dependencies to generate the bindings for
     #[clap(short = 'c', long)]
     pub component_id: String,
 }
@@ -40,8 +45,18 @@ impl GenerateBindingsCommand {
 
         match &self.language {
             BindingsLanguage::Rust => {
+                // TODO: If wit-bindgen is not in Cargo.toml, make sure to add it.
                 let opts = wit_bindgen_rust::Opts {
                     generate_all: true,
+                    // TODO: Make the extra attributes a clap option
+                    additional_derive_attributes: vec![
+                        "serde::Serialize".to_string(),
+                        "serde::Deserialize".to_string(),
+                        "Hash".to_string(),
+                        "Clone".to_string(),
+                        "PartialEq".to_string(),
+                        "Eq".to_string(),
+                    ],
                     // Uncomment this once spin-sdk is updated and remove dependency on wit_bindgen in Cargo.toml
                     //runtime_path: Some("::spin_sdk::wit_bindgen".to_string()),
                     ..Default::default()
@@ -65,6 +80,7 @@ impl GenerateBindingsCommand {
                 }
 
                 fs::write(self.output.join("mod.rs"), mod_output).await?;
+                println!("Bindings generated for Rust in {0}. You need to add the `wit-bindgen` crate to your Rust Spin app - e.g., `cargo add wit-bindgen`", self.output.to_str().expect("Failed to parse output path"));
             }
             BindingsLanguage::Ts => {
                 todo!("generate ts")
