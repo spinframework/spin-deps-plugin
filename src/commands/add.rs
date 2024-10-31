@@ -68,7 +68,7 @@ impl ComponentSource {
 
         if let Ok((name, version)) = package_name_ver(source) {
             if version.is_none() {
-                bail!("Version needs to specified for regitry sources.")
+                bail!("Version needs to specified for registry sources.")
             }
             return Ok(Self::Registry(RegistryAddCommand {
                 package: name,
@@ -96,6 +96,8 @@ impl AddCommand {
 
         let (mut resolve, main) = parse_component_bytes(component)?;
 
+        let selected_interfaces = self.select_interfaces(&mut resolve, main)?;
+
         let mut manifest = manifest_from_file(get_spin_manifest_path()?)?;
         let component_ids = get_component_ids(&manifest);
         let selected_component_index = select_prompt(
@@ -104,8 +106,6 @@ impl AddCommand {
             None,
         )?;
         let selected_component = &component_ids[selected_component_index];
-
-        let selected_interfaces = self.select_interfaces(&mut resolve, main)?;
 
         resolve.importize(
             resolve.select_world(main, None)?,
@@ -142,6 +142,10 @@ impl AddCommand {
     fn select_interfaces(&self, resolve: &mut Resolve, main: PackageId) -> Result<Vec<String>> {
         let world_id = resolve.select_world(main, None)?;
         let exported_interfaces = get_exported_interfaces(resolve, world_id);
+
+        if exported_interfaces.is_empty() {
+            bail!("No exported interfaces found in the component")
+        };
 
         let mut package_interface_map: HashMap<String, Vec<String>> = HashMap::new();
         let mut selected_interfaces: Vec<String> = Vec::new();
