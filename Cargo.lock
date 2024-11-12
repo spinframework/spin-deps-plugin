@@ -705,7 +705,6 @@ dependencies = [
  "anstyle",
  "clap_lex",
  "strsim 0.11.1",
- "terminal_size",
 ]
 
 [[package]]
@@ -4275,7 +4274,6 @@ dependencies = [
  "wit-bindgen-rust",
  "wit-component 0.217.0",
  "wit-parser 0.217.0",
- "wkg",
 ]
 
 [[package]]
@@ -4654,16 +4652,6 @@ source = "git+https://github.com/fermyon/spin#6df7262df11bce1046fb838ed2e7b1126c
 dependencies = [
  "atty",
  "termcolor",
-]
-
-[[package]]
-name = "terminal_size"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21bebf2b7c9e0a515f6e0f8c51dc0f8e4696391e6f1ff30379559f8365fb0df7"
-dependencies = [
- "rustix 0.38.37",
- "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -6677,27 +6665,6 @@ dependencies = [
  "log",
  "thiserror",
  "wast 35.0.2",
-]
-
-[[package]]
-name = "wkg"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "040ff7688fa0cc366a134afa2e2eefc6728cff41d8f6909715cfc2c38af01c67"
-dependencies = [
- "anyhow",
- "clap",
- "docker_credential",
- "futures-util",
- "oci-client",
- "oci-wasm 0.0.5",
- "tempfile",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "wasm-pkg-client",
- "wasm-pkg-common 0.5.1",
- "wit-component 0.216.0",
 ]
 
 [[package]]

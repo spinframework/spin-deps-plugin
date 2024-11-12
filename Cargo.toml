@@ -27,7 +27,6 @@ wit-bindgen-rust = { git = "https://github.com/fibonacci1729/wit-bindgen", branc
 wit-bindgen-core = { git = "https://github.com/fibonacci1729/wit-bindgen", branch = "deps" }
 wasm-pkg-common = "0.5.1"
 wasm-pkg-client = "0.5.1"
-wkg = "0.5.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # This needs to be an explicit dependency to enable
