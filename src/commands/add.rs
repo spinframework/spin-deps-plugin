@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use clap::Args;
 use http::HttpAddCommand;
 use local::LocalAddCommand;
@@ -16,12 +16,9 @@ use wasm_pkg_client::{PackageRef, Registry};
 use wit_parser::{PackageId, Resolve};
 
 use crate::common::{
-    constants::{SPIN_DEPS_WIT_FILE_NAME, SPIN_WIT_DIRECTORY},
-    interact::{select_multiple_prompt, select_prompt},
-    manifest::{edit_component_deps_in_manifest, get_component_ids, get_spin_manifest_path},
-    wit::{
+    constants::{SPIN_DEPS_WIT_FILE_NAME, SPIN_WIT_DIRECTORY}, interact::{select_multiple_prompt, select_prompt}, manifest::{edit_component_deps_in_manifest, get_component_ids, get_spin_manifest_path}, paths::fs_safe_segment, wit::{
         get_exported_interfaces, merge_dependecy_package, parse_component_bytes, resolve_to_wit,
-    },
+    }
 };
 
 mod http;
@@ -122,20 +119,45 @@ impl AddCommand {
             Some("dependency-world".to_string()),
         )?;
 
-        let component_dir = PathBuf::from(SPIN_WIT_DIRECTORY).join(&selected_component);
+        // for interface in &selected_interfaces {
+        //     let interface_wit_dir = PathBuf::from(SPIN_WIT_DIRECTORY).join(fs_safe_segment(interface));
+        // }
 
-        let output_wit = component_dir.join(SPIN_DEPS_WIT_FILE_NAME);
+        for (id, package) in &resolve.packages {
+            if id == main {
+                continue;
+            }
 
-        let base_resolve_file = if std::fs::exists(&output_wit)? {
-            Some(&output_wit)
-        } else {
-            fs::create_dir_all(&component_dir).await?;
-            None
-        };
+            let fs_name = fs_safe_segment(package.name.to_string());
 
-        let (merged_resolve, main) = merge_dependecy_package(base_resolve_file, &resolve, main)?;
-        let wit_text = resolve_to_wit(&merged_resolve, main)?;
-        fs::write(output_wit, wit_text).await?;
+            let dep_dir = PathBuf::from(SPIN_WIT_DIRECTORY).join("X-deps-X").join(&fs_name);
+            std::fs::create_dir_all(&dep_dir)?;
+
+            let output_wit_file = format!("{ns}-{name}.wit", ns = package.name.namespace, name = package.name.name);
+            let output_wit_path = dep_dir.join(output_wit_file);
+    
+            let output_wit_text = resolve_to_wit(&resolve, id).context("failed to resolve to wit")?;
+
+            fs::write(&output_wit_path, output_wit_text).await.context("failed to write wit")?;
+        }
+
+        // let component_dir = PathBuf::from(SPIN_WIT_DIRECTORY).join(&selected_component);
+
+        // let output_wit = component_dir.join(SPIN_DEPS_WIT_FILE_NAME);
+
+        // let base_resolve_file = if std::fs::exists(&output_wit)? {
+        //     Some(&output_wit)
+        // } else {
+        //     fs::create_dir_all(&component_dir).await?;
+        //     None
+        // };
+
+        // let (merged_resolve, main) = merge_dependecy_package(base_resolve_file, &resolve, main)?;
+        // let wit_text = resolve_to_wit(&merged_resolve, main)?;
+        // println!("making wit text");
+        // let wit_text = resolve_to_wit(&resolve, main)?;
+        // println!("writing dep out");
+        // fs::write(output_wit, wit_text).await?;
 
         self.update_manifest(
             source,
@@ -145,16 +167,16 @@ impl AddCommand {
         )
         .await?;
 
-        let target_component_id = KebabId::try_from(selected_component.clone()).map_err(|e| anyhow!("{e}"))?;
-        let target_component = manifest.components.get(&target_component_id).ok_or_else(|| anyhow!("component does not exist"))?;
-        let target = BindOMatic {
-            // manifest: &manifest,
-            root_dir: manifest_file.parent().ok_or_else(|| anyhow!("Manifest cannot be the root directory"))?,
-            target_component,
-            component_id: &selected_component,
-            interfaces: &selected_interfaces
-        };
-        try_generate_bindings(&target)?;
+        // let target_component_id = KebabId::try_from(selected_component.clone()).map_err(|e| anyhow!("{e}"))?;
+        // let target_component = manifest.components.get(&target_component_id).ok_or_else(|| anyhow!("component does not exist"))?;
+        // let target = BindOMatic {
+        //     // manifest: &manifest,
+        //     root_dir: manifest_file.parent().ok_or_else(|| anyhow!("Manifest cannot be the root directory"))?,
+        //     target_component,
+        //     component_id: &selected_component,
+        //     interfaces: &selected_interfaces
+        // };
+        // try_generate_bindings(&target)?;
 
         Ok(())
     }
@@ -307,163 +329,163 @@ fn package_name_ver(package_name: &str) -> Result<(PackageRef, Option<VersionReq
     Ok((package.parse()?, version))
 }
 
-struct BindOMatic<'a> {
-    // manifest: &'a AppManifest,
-    root_dir: &'a Path,
-    target_component: &'a spin_manifest::schema::v2::Component,
-    component_id: &'a str,
-    interfaces: &'a [String],
-}
+// struct BindOMatic<'a> {
+//     // manifest: &'a AppManifest,
+//     root_dir: &'a Path,
+//     target_component: &'a spin_manifest::schema::v2::Component,
+//     component_id: &'a str,
+//     interfaces: &'a [String],
+// }
 
-enum Language {
-    Rust { cargo_toml: PathBuf },
-    TypeScript { package_json: PathBuf },
-}
+// enum Language {
+//     Rust { cargo_toml: PathBuf },
+//     TypeScript { package_json: PathBuf },
+// }
 
-impl<'a> BindOMatic<'a> {
-    fn try_infer_language(&self) -> anyhow::Result<Language> {
-        let workdir = self.target_component.build.as_ref().and_then(|b| b.workdir.as_ref());
-        let build_dir = match workdir {
-            None => self.root_dir.to_owned(),
-            Some(d) => self.root_dir.join(d),
-        };
+// impl<'a> BindOMatic<'a> {
+//     fn try_infer_language(&self) -> anyhow::Result<Language> {
+//         let workdir = self.target_component.build.as_ref().and_then(|b| b.workdir.as_ref());
+//         let build_dir = match workdir {
+//             None => self.root_dir.to_owned(),
+//             Some(d) => self.root_dir.join(d),
+//         };
 
-        if !build_dir.is_dir() {
-            bail!("unable to establish build directory for component");
-        }
+//         if !build_dir.is_dir() {
+//             bail!("unable to establish build directory for component");
+//         }
 
-        let cargo_toml = build_dir.join("Cargo.toml");
-        if cargo_toml.is_file() {
-            return Ok(Language::Rust { cargo_toml });
-        }
-        let package_json = build_dir.join("package.json");
-        if package_json.is_file() {
-            // TODO: yes also JavaScript
-            return Ok(Language::TypeScript { package_json });
-        }
+//         let cargo_toml = build_dir.join("Cargo.toml");
+//         if cargo_toml.is_file() {
+//             return Ok(Language::Rust { cargo_toml });
+//         }
+//         let package_json = build_dir.join("package.json");
+//         if package_json.is_file() {
+//             // TODO: yes also JavaScript
+//             return Ok(Language::TypeScript { package_json });
+//         }
 
-        Err(anyhow!("unable to determine the component source language"))
-    }
-}
+//         Err(anyhow!("unable to determine the component source language"))
+//     }
+// }
 
-fn try_generate_bindings(target: &BindOMatic) -> anyhow::Result<()> {
-    match target.try_infer_language()? {
-        Language::Rust { cargo_toml } => generate_rust_bindings(target.root_dir, &cargo_toml, target.component_id, target.interfaces),
-        Language::TypeScript { package_json } => todo!(),
-    }
-}
+// fn try_generate_bindings(target: &BindOMatic) -> anyhow::Result<()> {
+//     match target.try_infer_language()? {
+//         Language::Rust { cargo_toml } => generate_rust_bindings(target.root_dir, &cargo_toml, target.component_id, target.interfaces),
+//         Language::TypeScript { package_json } => todo!(),
+//     }
+// }
 
-fn generate_rust_bindings(root_dir: &Path, cargo_toml: &Path, component_id: &str, interfaces: &[String]) -> anyhow::Result<()> {
-    // add wit-bindgen to cargo.toml if needed
-    let mut did_change = false;
-    let cargo_text = std::fs::read_to_string(cargo_toml)?;
-    let mut cargo_doc: toml_edit::DocumentMut = cargo_text.parse()?;
-    let deps = cargo_doc.entry("dependencies");
-    match deps {
-        toml_edit::Entry::Occupied(mut occupied_entry) => {
-            let Some(deps_table) = occupied_entry.get_mut().as_table_mut() else {
-                return Err(anyhow!("existing dependencies table is... not a table"));
-            };
-            if !deps_table.contains_key("wit-bindgen") {
-                let wbg_ver = toml_edit::Formatted::new("0.34.0".to_owned());
-                deps_table.insert("wit-bindgen", toml_edit::Item::Value(toml_edit::Value::String(wbg_ver)));
-                did_change = true;
-            }
-        },
-        toml_edit::Entry::Vacant(vacant_entry) => {
-            let mut deps_table = toml_edit::Table::new();
-            let wbg_ver = toml_edit::Formatted::new("0.34.0".to_owned());
-            deps_table.insert("wit-bindgen", toml_edit::Item::Value(toml_edit::Value::String(wbg_ver)));
-            vacant_entry.insert(toml_edit::Item::Table(deps_table));
-            did_change = true;
-        },
-    };
-    let new_cargo_text = cargo_doc.to_string();
-    if did_change {
-        std::fs::write(cargo_toml, new_cargo_text)?;
-    }
+// fn generate_rust_bindings(root_dir: &Path, cargo_toml: &Path, component_id: &str, interfaces: &[String]) -> anyhow::Result<()> {
+//     // add wit-bindgen to cargo.toml if needed
+//     let mut did_change = false;
+//     let cargo_text = std::fs::read_to_string(cargo_toml)?;
+//     let mut cargo_doc: toml_edit::DocumentMut = cargo_text.parse()?;
+//     let deps = cargo_doc.entry("dependencies");
+//     match deps {
+//         toml_edit::Entry::Occupied(mut occupied_entry) => {
+//             let Some(deps_table) = occupied_entry.get_mut().as_table_mut() else {
+//                 return Err(anyhow!("existing dependencies table is... not a table"));
+//             };
+//             if !deps_table.contains_key("wit-bindgen") {
+//                 let wbg_ver = toml_edit::Formatted::new("0.34.0".to_owned());
+//                 deps_table.insert("wit-bindgen", toml_edit::Item::Value(toml_edit::Value::String(wbg_ver)));
+//                 did_change = true;
+//             }
+//         },
+//         toml_edit::Entry::Vacant(vacant_entry) => {
+//             let mut deps_table = toml_edit::Table::new();
+//             let wbg_ver = toml_edit::Formatted::new("0.34.0".to_owned());
+//             deps_table.insert("wit-bindgen", toml_edit::Item::Value(toml_edit::Value::String(wbg_ver)));
+//             vacant_entry.insert(toml_edit::Item::Table(deps_table));
+//             did_change = true;
+//         },
+//     };
+//     let new_cargo_text = cargo_doc.to_string();
+//     if did_change {
+//         std::fs::write(cargo_toml, new_cargo_text)?;
+//     }
 
-    // inject or modify bind script in src/lib.rs
-    let lib_file = root_dir.join("src/lib.rs");
-    if !lib_file.is_file() {
-        bail!("src/lib.rs is not a file");
-    }
-    let lib_text = std::fs::read_to_string(&lib_file)?;
+//     // inject or modify bind script in src/lib.rs
+//     let lib_file = root_dir.join("src/lib.rs");
+//     if !lib_file.is_file() {
+//         bail!("src/lib.rs is not a file");
+//     }
+//     let lib_text = std::fs::read_to_string(&lib_file)?;
 
-    // ALL RIGHT HERE WE GO
+//     // ALL RIGHT HERE WE GO
 
-    // If we already have a `mod deps`...
-    if let Some(mod_deps_index) = lib_text.lines().position(|l| l.trim().starts_with("mod deps {")) {
-        // oh no we gotta do some flippin parsing
-        // TODO: can syn help us?  It seemed a bit agonising and not terribly supportive
-        let mut lines: Vec<_> = lib_text.lines().map(|s| s.to_owned()).collect();
-        let mut index = mod_deps_index;
-        let mut in_imports = false;
-        let mut in_with = false;
-        let mut unseen_imports: Vec<_> = interfaces.iter().map(|i| format!("import {i};")).collect();
-        let mut unseen_withs: Vec<_> = interfaces.iter().map(|i| format!("\"{i}\": generate,")).collect();
-        loop {
-            index += 1;
-            let current = &lines[index];
-            if current.trim().starts_with("world imports {") {
-                in_imports = true;
-                continue;
-            }
-            if in_imports {
-                if current.trim().starts_with("}") {
-                    // insert those not yet seen and BUMP INDEX PAST THEM
-                    in_imports = false;
-                    for import in &unseen_imports {
-                        lines.insert(index - 1, format!("            {import}"));
-                        index += 1;
-                    }
-                    continue;;
-                }
-                if current.trim().starts_with("import ") {
-                    // if this was one we were planning to insert, remove it from the plan!
-                    unseen_imports.retain(|imp| imp != current.trim());
-                    continue;
-                }
-            }
-            if current.trim().starts_with("with: {") {
-                in_with = true;
-                continue;
-            }
-            if in_with {
-                if current.trim().ends_with(": generate,") {
-                    // if this was one we were planning to insert, remove it from the plan!
-                    unseen_withs.retain(|w| w != current.trim());
-                    continue;
-                }
+//     // If we already have a `mod deps`...
+//     if let Some(mod_deps_index) = lib_text.lines().position(|l| l.trim().starts_with("mod deps {")) {
+//         // oh no we gotta do some flippin parsing
+//         // TODO: can syn help us?  It seemed a bit agonising and not terribly supportive
+//         let mut lines: Vec<_> = lib_text.lines().map(|s| s.to_owned()).collect();
+//         let mut index = mod_deps_index;
+//         let mut in_imports = false;
+//         let mut in_with = false;
+//         let mut unseen_imports: Vec<_> = interfaces.iter().map(|i| format!("import {i};")).collect();
+//         let mut unseen_withs: Vec<_> = interfaces.iter().map(|i| format!("\"{i}\": generate,")).collect();
+//         loop {
+//             index += 1;
+//             let current = &lines[index];
+//             if current.trim().starts_with("world imports {") {
+//                 in_imports = true;
+//                 continue;
+//             }
+//             if in_imports {
+//                 if current.trim().starts_with("}") {
+//                     // insert those not yet seen and BUMP INDEX PAST THEM
+//                     in_imports = false;
+//                     for import in &unseen_imports {
+//                         lines.insert(index - 1, format!("            {import}"));
+//                         index += 1;
+//                     }
+//                     continue;;
+//                 }
+//                 if current.trim().starts_with("import ") {
+//                     // if this was one we were planning to insert, remove it from the plan!
+//                     unseen_imports.retain(|imp| imp != current.trim());
+//                     continue;
+//                 }
+//             }
+//             if current.trim().starts_with("with: {") {
+//                 in_with = true;
+//                 continue;
+//             }
+//             if in_with {
+//                 if current.trim().ends_with(": generate,") {
+//                     // if this was one we were planning to insert, remove it from the plan!
+//                     unseen_withs.retain(|w| w != current.trim());
+//                     continue;
+//                 }
 
-            }
-        }
+//             }
+//         }
 
-    } else {
-        // We will create a `mod deps` with SCIENCE in it
-        let imps = interfaces.iter().map(|i| format!(r#"            import {i};"#)).collect::<Vec<_>>();
-        let imps = imps.join("\n");
-        let gens = interfaces.iter().map(|i| format!(r#"            "{i}": generate,"#)).collect::<Vec<_>>();
-        let gens = gens.join("\n");
-        let deps_text = format!(r###"
-mod deps {{
-    wit_bindgen::generate!({{
-        inline: r#"
-        package root:component;
-        world imports {{
-{imps}
-        }}
-        "#,
-        with: {{
-{gens}
-        }},
-        path: ".wit/components/{component_id}",
-    }});
-}}
-"###);
+//     } else {
+//         // We will create a `mod deps` with SCIENCE in it
+//         let imps = interfaces.iter().map(|i| format!(r#"            import {i};"#)).collect::<Vec<_>>();
+//         let imps = imps.join("\n");
+//         let gens = interfaces.iter().map(|i| format!(r#"            "{i}": generate,"#)).collect::<Vec<_>>();
+//         let gens = gens.join("\n");
+//         let deps_text = format!(r###"
+// mod deps {{
+//     wit_bindgen::generate!({{
+//         inline: r#"
+//         package root:component;
+//         world imports {{
+// {imps}
+//         }}
+//         "#,
+//         with: {{
+// {gens}
+//         }},
+//         path: ".wit/components/{component_id}",
+//     }});
+// }}
+// "###);
 
-        // TODO: insert this into the file in a SCIENTIFICALLY DETERMINED place
-    }
+//         // TODO: insert this into the file in a SCIENTIFICALLY DETERMINED place
+//     }
 
-    todo!()
-}
+//     todo!()
+// }
