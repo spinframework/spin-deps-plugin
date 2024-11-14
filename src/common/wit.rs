@@ -40,7 +40,7 @@ pub fn parse_component_bytes(bytes: Vec<u8>) -> Result<(Resolve, PackageId)> {
 pub fn get_exported_interfaces(
     resolve: &Resolve,
     world_id: wit_parser::WorldId,
-) -> Vec<(String, String)> {
+) -> Vec<(wit_parser::PackageName, String)> {
     resolve.worlds[world_id]
         .exports
         .iter()
@@ -49,11 +49,7 @@ pub fn get_exported_interfaces(
                 let i = &resolve.interfaces[*id];
                 let pkg_id = i.package.unwrap();
                 let pkg = &resolve.packages[pkg_id];
-                let mut pkg_name = format!("{}:{}", pkg.name.namespace, pkg.name.name);
-                if let Some(ver) = &pkg.name.version {
-                    pkg_name.push_str(&format!("@{}", ver));
-                }
-                Some((pkg_name, i.name.clone().unwrap_or_default()))
+                Some((pkg.name.clone(), i.name.clone().unwrap_or_default()))
             }
             _ => None,
         })

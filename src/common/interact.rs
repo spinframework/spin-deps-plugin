@@ -14,7 +14,10 @@ pub fn select_prompt(
     Ok(select.interact()?)
 }
 
-pub fn select_multiple_prompt(prompt: &str, selection_list: &[String]) -> Result<Vec<usize>> {
+pub fn select_multiple_prompt<T: ToString>(
+    prompt: &str,
+    selection_list: &[T],
+) -> Result<Vec<usize>> {
     Ok(MultiSelect::new()
         .with_prompt(prompt)
         .items(selection_list)

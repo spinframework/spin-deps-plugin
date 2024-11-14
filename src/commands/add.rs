@@ -147,8 +147,7 @@ impl AddCommand {
             bail!("No exported interfaces found in the component")
         };
 
-        let mut package_interface_map: HashMap<String, Vec<String>> = HashMap::new();
-        let mut selected_interfaces: Vec<String> = Vec::new();
+        let mut package_interface_map: HashMap<_, Vec<String>> = HashMap::new();
 
         // Map interfaces to their respective packages
         for (package_name, interface) in exported_interfaces {
@@ -164,6 +163,8 @@ impl AddCommand {
             "Select packages to import (use space to select, enter to confirm)",
             &package_names,
         )?;
+
+        let mut selected_interfaces = Vec::new();
 
         for &package_idx in selected_package_indices.iter() {
             let package_name = &package_names[package_idx];
@@ -190,10 +191,19 @@ impl AddCommand {
             )?;
 
             if interface_count > 1 && selected_interface_idx == 0 {
-                selected_interfaces.push(package_name.clone());
+                selected_interfaces.push(package_name.to_string());
             } else {
                 let interface_name = &interface_options[selected_interface_idx];
-                selected_interfaces.push(format!("{}/{}", package_name, interface_name));
+                let full_itf_name = if let Some(version) = package_name.version.as_ref() {
+                    format!(
+                        "{ns}:{name}/{interface_name}@{version}",
+                        ns = package_name.namespace,
+                        name = package_name.name
+                    )
+                } else {
+                    format!("{package_name}/{interface_name}")
+                };
+                selected_interfaces.push(full_itf_name);
             }
         }
 
@@ -231,7 +241,7 @@ impl AddCommand {
 
         for interface in selected_interfaces {
             component.dependencies.inner.insert(
-                DependencyName::Package(DependencyPackageName::try_from(interface)?),
+                DependencyName::Package(DependencyPackageName::try_from(interface.clone())?),
                 component_dependency.clone(),
             );
         }
