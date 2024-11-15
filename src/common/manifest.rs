@@ -1,6 +1,6 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use spin_manifest::schema::v2::{AppManifest, ComponentDependencies, ComponentDependency};
-use std::path::PathBuf;
+use std::path::Path;
 use tokio::fs;
 use toml_edit::DocumentMut;
 
@@ -11,11 +11,11 @@ pub fn get_component_ids(manifest: &AppManifest) -> Vec<String> {
 // This is a helper function to edit the dependency table in the manifest file
 // while preserving the order of the manifest.
 pub async fn edit_component_deps_in_manifest(
+    manifest_file: &Path,
     component_id: &str,
     component_deps: &ComponentDependencies,
 ) -> Result<String> {
-    let manifest_path = get_spin_manifest_path()?;
-    let manifest = fs::read_to_string(manifest_path).await?;
+    let manifest = fs::read_to_string(manifest_file).await?;
     let mut doc = manifest.parse::<DocumentMut>()?;
 
     let mut dependencies_table = toml_edit::Table::new();
@@ -66,13 +66,4 @@ pub async fn edit_component_deps_in_manifest(
     doc["component"][component_id]["dependencies"] = toml_edit::Item::Table(dependencies_table);
 
     Ok(doc.to_string())
-}
-
-// TODO: Eventually bring this function with the proposed Spin functionality of searching in parent Directories.
-pub fn get_spin_manifest_path() -> Result<PathBuf> {
-    let manifest_path = PathBuf::from("spin.toml");
-    if !manifest_path.exists() {
-        bail!("No spin.toml file found in the current directory");
-    }
-    Ok(manifest_path)
 }
