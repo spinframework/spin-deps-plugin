@@ -440,9 +440,9 @@ async fn generate_rust_bindings(root_dir: &Path, cargo_toml: &Path, _component_i
     let dep_module_name = crate::language::rust::identifier_safe(package_name);
 
     // step 1: create a module with the generate! macro
-    let imps = interfaces.iter().map(|i| format!(r#"        import {i};"#)).collect::<Vec<_>>();
+    let imps = interfaces.iter().filter(|itf| !crate::language::rust::is_stdlib_known(itf)).map(|i| format!(r#"        import {i};"#)).collect::<Vec<_>>();
     let imps = imps.join("\n");
-    let gens = interfaces.iter().map(|i| format!(r#"        "{i}": generate,"#)).collect::<Vec<_>>();
+    let gens = interfaces.iter().filter(|itf| !crate::language::rust::is_stdlib_known(itf)).map(|i| format!(r#"        "{i}": generate,"#)).collect::<Vec<_>>();
     let gens = gens.join("\n");
     let gen_name = format!("{}-{}", package_name.namespace, package_name.name);
 
@@ -503,87 +503,4 @@ async fn generate_rust_bindings(root_dir: &Path, cargo_toml: &Path, _component_i
     }
 
     Ok(())
-
-//     let lib_file = root_dir.join("src/lib.rs");
-//     if !lib_file.is_file() {
-//         bail!("src/lib.rs is not a file");
-//     }
-//     let lib_text = std::fs::read_to_string(&lib_file)?;
-
-//     // ALL RIGHT HERE WE GO
-
-//     // If we already have a `mod deps`...
-//     if let Some(mod_deps_index) = lib_text.lines().position(|l| l.trim().starts_with("mod deps {")) {
-//         // oh no we gotta do some flippin parsing
-//         // TODO: can syn help us?  It seemed a bit agonising and not terribly supportive
-//         let mut lines: Vec<_> = lib_text.lines().map(|s| s.to_owned()).collect();
-//         let mut index = mod_deps_index;
-//         let mut in_imports = false;
-//         let mut in_with = false;
-//         let mut unseen_imports: Vec<_> = interfaces.iter().map(|i| format!("import {i};")).collect();
-//         let mut unseen_withs: Vec<_> = interfaces.iter().map(|i| format!("\"{i}\": generate,")).collect();
-//         loop {
-//             index += 1;
-//             let current = &lines[index];
-//             if current.trim().starts_with("world imports {") {
-//                 in_imports = true;
-//                 continue;
-//             }
-//             if in_imports {
-//                 if current.trim().starts_with("}") {
-//                     // insert those not yet seen and BUMP INDEX PAST THEM
-//                     in_imports = false;
-//                     for import in &unseen_imports {
-//                         lines.insert(index - 1, format!("            {import}"));
-//                         index += 1;
-//                     }
-//                     continue;;
-//                 }
-//                 if current.trim().starts_with("import ") {
-//                     // if this was one we were planning to insert, remove it from the plan!
-//                     unseen_imports.retain(|imp| imp != current.trim());
-//                     continue;
-//                 }
-//             }
-//             if current.trim().starts_with("with: {") {
-//                 in_with = true;
-//                 continue;
-//             }
-//             if in_with {
-//                 if current.trim().ends_with(": generate,") {
-//                     // if this was one we were planning to insert, remove it from the plan!
-//                     unseen_withs.retain(|w| w != current.trim());
-//                     continue;
-//                 }
-
-//             }
-//         }
-
-//     } else {
-//         // We will create a `mod deps` with SCIENCE in it
-//         let imps = interfaces.iter().map(|i| format!(r#"            import {i};"#)).collect::<Vec<_>>();
-//         let imps = imps.join("\n");
-//         let gens = interfaces.iter().map(|i| format!(r#"            "{i}": generate,"#)).collect::<Vec<_>>();
-//         let gens = gens.join("\n");
-//         let deps_text = format!(r###"
-// mod deps {{
-//     wit_bindgen::generate!({{
-//         inline: r#"
-//         package root:component;
-//         world imports {{
-// {imps}
-//         }}
-//         "#,
-//         with: {{
-// {gens}
-//         }},
-//         path: ".wit/components/{component_id}",
-//     }});
-// }}
-// "###);
-
-//         // TODO: insert this into the file in a SCIENTIFICALLY DETERMINED place
-//     }
-
-    // todo!()
 }
