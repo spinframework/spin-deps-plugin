@@ -165,7 +165,6 @@ impl AddCommand {
                 // manifest: &manifest,
                 root_dir,
                 target_component,
-                component_id: &selected_component,
                 package_name: &package,
                 interfaces: &interfaces,
                 rel_wit_path: &output_wit_path
@@ -356,17 +355,15 @@ fn qualified_itf_name(package_name: &wit_parser::PackageName, interface_name: &s
 }
 
 struct BindOMatic<'a> {
-    // manifest: &'a AppManifest,
     root_dir: &'a Path,
     target_component: &'a spin_manifest::schema::v2::Component,
-    component_id: &'a str,
     package_name: &'a wit_parser::PackageName,
     interfaces: &'a [String],
     rel_wit_path: &'a Path,
 }
 
 enum Language {
-    Rust { cargo_toml: PathBuf },
+    Rust,
     #[allow(dead_code)]  // for now
     TypeScript { package_json: PathBuf },
 }
@@ -385,7 +382,7 @@ impl<'a> BindOMatic<'a> {
 
         let cargo_toml = build_dir.join("Cargo.toml");
         if cargo_toml.is_file() {
-            return Ok(Language::Rust { cargo_toml });
+            return Ok(Language::Rust);
         }
         let package_json = build_dir.join("package.json");
         if package_json.is_file() {
@@ -399,50 +396,33 @@ impl<'a> BindOMatic<'a> {
 
 async fn try_generate_bindings<'a>(target: &'a BindOMatic<'a>) -> anyhow::Result<()> {
     match target.try_infer_language()? {
-        Language::Rust { cargo_toml } => generate_rust_bindings(target.root_dir, &cargo_toml, target.component_id, target.package_name, target.interfaces, target.rel_wit_path).await,
+        Language::Rust => generate_rust_bindings(target.root_dir, target.package_name, target.interfaces, target.rel_wit_path).await,
         Language::TypeScript { package_json: _ } => todo!(),
     }
 }
 
-async fn generate_rust_bindings(root_dir: &Path, cargo_toml: &Path, _component_id: &str, package_name: &wit_parser::PackageName, interfaces: &[String], rel_wit_path: &Path) -> anyhow::Result<()> {
-    // add wit-bindgen to cargo.toml if needed
-    let mut did_change = false;
-    let cargo_text = std::fs::read_to_string(cargo_toml)?;
-    let mut cargo_doc: toml_edit::DocumentMut = cargo_text.parse()?;
-    let deps = cargo_doc.entry("dependencies");
-    match deps {
-        toml_edit::Entry::Occupied(mut occupied_entry) => {
-            let Some(deps_table) = occupied_entry.get_mut().as_table_mut() else {
-                return Err(anyhow!("existing dependencies table is... not a table"));
-            };
-            if !deps_table.contains_key("wit-bindgen") {
-                let wbg_ver = toml_edit::Formatted::new("0.34.0".to_owned());
-                deps_table.insert("wit-bindgen", toml_edit::Item::Value(toml_edit::Value::String(wbg_ver)));
-                did_change = true;
-            }
-        },
-        toml_edit::Entry::Vacant(vacant_entry) => {
-            let mut deps_table = toml_edit::Table::new();
-            let wbg_ver = toml_edit::Formatted::new("0.34.0".to_owned());
-            deps_table.insert("wit-bindgen", toml_edit::Item::Value(toml_edit::Value::String(wbg_ver)));
-            vacant_entry.insert(toml_edit::Item::Table(deps_table));
-            did_change = true;
-        },
-    };
-    let new_cargo_text = cargo_doc.to_string();
-    if did_change {
-        std::fs::write(cargo_toml, new_cargo_text)?;
-    }
-
+async fn generate_rust_bindings(root_dir: &Path, package_name: &wit_parser::PackageName, interfaces: &[String], rel_wit_path: &Path) -> anyhow::Result<()> {
     // now set up the bindings
     let deps_rs_dir = root_dir.join("src/deps");
     fs::create_dir_all(&deps_rs_dir).await?;
     let dep_module_name = crate::language::rust::identifier_safe(package_name);
 
     // step 1: create a module with the generate! macro
-    let imps = interfaces.iter().filter(|itf| !crate::language::rust::is_stdlib_known(itf)).map(|i| format!(r#"        import {i};"#)).collect::<Vec<_>>();
+    let imps = interfaces.iter()
+        .filter(|itf| !crate::language::rust::is_stdlib_known(itf))
+        .map(|i| format!(r#"        import {i};"#)).collect::<Vec<_>>();
     let imps = imps.join("\n");
-    let gens = interfaces.iter().filter(|itf| !crate::language::rust::is_stdlib_known(itf)).map(|i| format!(r#"        "{i}": generate,"#)).collect::<Vec<_>>();
+    let gens = interfaces.iter()
+        .filter(|itf| !crate::language::rust::is_stdlib_known(itf))
+        .map(|i| if crate::language::rust::is_sdk_known(i) {
+                let (qname, _) = i.split_once("@").unwrap(); // foo:bar/baz
+                let rust_qname = qname.replace(":", "::").replace("/", "::").replace("-", "_");
+                let sdk_form = format!("spin_sdk::wit::{rust_qname}");  // TODO: this doesn't allow for when multiple versions are present!  when that happens, but ONLY when that happens, bindgen version-mangles the name
+                format!(r#"        "{i}": {sdk_form},"#)
+            } else {
+                format!(r#"        "{i}": generate,"#)
+            }
+        ).collect::<Vec<_>>();
     let gens = gens.join("\n");
     let gen_name = format!("{}-{}", package_name.namespace, package_name.name);
 
