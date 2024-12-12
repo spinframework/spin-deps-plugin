@@ -34,8 +34,12 @@ impl GenerateBindingsCommand {
             .join(SPIN_DEPS_WIT_FILE_NAME);
 
         if !std::fs::exists(&wit_path)? {
-            // TODO: warn that the file does not exist
-            return Ok(());
+            anyhow::bail!(
+                r#"The WIT file that `spin deps` uses to track component dependencies doesn't exist. This can happen if:
+* the component name is incorrect
+* you've not previously run `spin deps add` for this component
+The expected file is {wit_path:?}"#
+            );
         }
 
         let mut resolve = Resolve::default();
