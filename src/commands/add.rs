@@ -9,16 +9,21 @@ use spin_manifest::{
     schema::v2::{AppManifest, ComponentDependency},
 };
 use spin_serde::{DependencyName, DependencyPackageName, KebabId};
-use std::{collections::HashMap, path::{Path, PathBuf}};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 use tokio::fs;
 use url::Url;
 use wasm_pkg_client::{PackageRef, Registry};
 use wit_parser::{PackageId, Resolve};
 
 use crate::common::{
-    constants::SPIN_WIT_DIRECTORY, interact::{select_multiple_prompt, select_prompt}, manifest::{edit_component_deps_in_manifest, get_component_ids}, paths::fs_safe_segment, wit::{
-        get_exported_interfaces, parse_component_bytes, resolve_to_wit,
-    }
+    constants::SPIN_WIT_DIRECTORY,
+    interact::{select_multiple_prompt, select_prompt},
+    manifest::{edit_component_deps_in_manifest, get_component_ids},
+    paths::fs_safe_segment,
+    wit::{get_exported_interfaces, parse_component_bytes, resolve_to_wit},
 };
 
 mod http;
@@ -94,7 +99,8 @@ impl ComponentSource {
 
 impl AddCommand {
     pub async fn run(&self) -> Result<()> {
-        let (manifest_file, distance) = spin_common::paths::find_manifest_file_path(self.manifest_path.as_ref())?;
+        let (manifest_file, distance) =
+            spin_common::paths::find_manifest_file_path(self.manifest_path.as_ref())?;
         if distance > 0 {
             anyhow::bail!(
                 "No spin.toml in current directory - did you mean '-f {}'?",
@@ -131,48 +137,78 @@ impl AddCommand {
         //     };
         // }
 
-        let target_component_id = KebabId::try_from(selected_component.clone()).map_err(|e| anyhow!("{e}"))?;
-        let target_component = manifest.components.get(&target_component_id).ok_or_else(|| anyhow!("component does not exist"))?;
+        let target_component_id =
+            KebabId::try_from(selected_component.clone()).map_err(|e| anyhow!("{e}"))?;
+        let target_component = manifest
+            .components
+            .get(&target_component_id)
+            .ok_or_else(|| anyhow!("component does not exist"))?;
 
-        let root_dir = manifest_file.parent().ok_or_else(|| anyhow!("Manifest cannot be the root directory"))?;
-        
+        let root_dir = manifest_file
+            .parent()
+            .ok_or_else(|| anyhow!("Manifest cannot be the root directory"))?;
+
         // gen bindings
         for package in selected_interface_map.keys() {
             // if id != main {
             //     continue;  // TODO: yes, this is a silly way to just do main
             // }
-            let id = resolve.packages.iter().find(|(_, p)| &p.name == package).unwrap().0;
+            let id = resolve
+                .packages
+                .iter()
+                .find(|(_, p)| &p.name == package)
+                .unwrap()
+                .0;
 
             let fs_name = fs_safe_segment(package.name.to_string());
 
-            let dep_dir = PathBuf::from(SPIN_WIT_DIRECTORY).join("deps").join(&fs_name);
+            let dep_dir = PathBuf::from(SPIN_WIT_DIRECTORY)
+                .join("deps")
+                .join(&fs_name);
             std::fs::create_dir_all(&dep_dir)?;
 
-            let output_wit_file = format!("{ns}-{name}.wit", ns = package.namespace, name = package.name);
+            let output_wit_file = format!(
+                "{ns}-{name}.wit",
+                ns = package.namespace,
+                name = package.name
+            );
             let output_wit_path = dep_dir.join(output_wit_file);
-    
-            let output_wit_text = resolve_to_wit(&resolve, id).context("failed to resolve to wit")?;
 
-            fs::write(&output_wit_path, output_wit_text).await.context("failed to write wit")?;
+            let output_wit_text =
+                resolve_to_wit(&resolve, id).context("failed to resolve to wit")?;
+
+            fs::write(&output_wit_path, output_wit_text)
+                .await
+                .context("failed to write wit")?;
 
             // I _think_ we have to generate bindings for *all* the interfaces
             // because of the possibility of dependencies
-            let interfaces = resolve.packages.iter().flat_map(|(_, p)|
-                p.interfaces.keys().map(|itf_name| qualified_itf_name(&p.name, itf_name))
-            ).collect::<Vec<_>>();
+            let interfaces = resolve
+                .packages
+                .iter()
+                .flat_map(|(_, p)| {
+                    p.interfaces
+                        .keys()
+                        .map(|itf_name| qualified_itf_name(&p.name, itf_name))
+                })
+                .collect::<Vec<_>>();
 
             let target = BindOMatic {
                 // manifest: &manifest,
                 root_dir,
                 target_component,
-                package_name: &package,
+                package_name: package,
                 interfaces: &interfaces,
-                rel_wit_path: &output_wit_path
+                rel_wit_path: &output_wit_path,
             };
             try_generate_bindings(&target).await?;
         }
 
-        let selected_interfaces = selected_interface_map.values().flatten().cloned().collect::<Vec<_>>();
+        let selected_interfaces = selected_interface_map
+            .values()
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
         self.update_manifest(
             source,
             &manifest_file,
@@ -199,10 +235,10 @@ impl AddCommand {
 
     fn target_component(&self, manifest: &AppManifest) -> anyhow::Result<String> {
         if let Some(id) = &self.add_to_component {
-            return Ok(id.to_owned())
+            return Ok(id.to_owned());
         }
 
-        let component_ids = get_component_ids(&manifest);
+        let component_ids = get_component_ids(manifest);
         let selected_component_index = select_prompt(
             "Select a component to add the dependency to",
             &component_ids,
@@ -214,7 +250,11 @@ impl AddCommand {
     }
 
     /// Prompts the user to select an interface to import.
-    fn select_interfaces(&self, resolve: &mut Resolve, main: PackageId) -> Result<HashMap<wit_parser::PackageName, Vec<String>>> {
+    fn select_interfaces(
+        &self,
+        resolve: &mut Resolve,
+        main: PackageId,
+    ) -> Result<HashMap<wit_parser::PackageName, Vec<String>>> {
         let world_id = resolve.select_world(main, None)?;
         let exported_interfaces = get_exported_interfaces(resolve, world_id);
 
@@ -319,8 +359,12 @@ impl AddCommand {
             );
         }
 
-        let doc =
-            edit_component_deps_in_manifest(manifest_file, selected_component, &component.dependencies).await?;
+        let doc = edit_component_deps_in_manifest(
+            manifest_file,
+            selected_component,
+            &component.dependencies,
+        )
+        .await?;
 
         fs::write(manifest_file, doc).await?;
 
@@ -364,20 +408,28 @@ struct BindOMatic<'a> {
 
 enum Language {
     Rust,
-    #[allow(dead_code)]  // for now
-    TypeScript { package_json: PathBuf },
+    #[allow(dead_code)] // for now
+    TypeScript {
+        package_json: PathBuf,
+    },
 }
 
-impl<'a> BindOMatic<'a> {
+impl BindOMatic<'_> {
     fn try_infer_language(&self) -> anyhow::Result<Language> {
-        let workdir = self.target_component.build.as_ref().and_then(|b| b.workdir.as_ref());
+        let workdir = self
+            .target_component
+            .build
+            .as_ref()
+            .and_then(|b| b.workdir.as_ref());
         let build_dir = match workdir {
             None => self.root_dir.to_owned(),
             Some(d) => self.root_dir.join(d),
         };
 
         if !build_dir.is_dir() {
-            bail!("unable to establish build directory for component (thought it was {build_dir:?})");
+            bail!(
+                "unable to establish build directory for component (thought it was {build_dir:?})"
+            );
         }
 
         let cargo_toml = build_dir.join("Cargo.toml");
@@ -396,39 +448,63 @@ impl<'a> BindOMatic<'a> {
 
 async fn try_generate_bindings<'a>(target: &'a BindOMatic<'a>) -> anyhow::Result<()> {
     match target.try_infer_language()? {
-        Language::Rust => generate_rust_bindings(target.root_dir, target.package_name, target.interfaces, target.rel_wit_path).await,
+        Language::Rust => {
+            generate_rust_bindings(
+                target.root_dir,
+                target.package_name,
+                target.interfaces,
+                target.rel_wit_path,
+            )
+            .await
+        }
         Language::TypeScript { package_json: _ } => todo!(),
     }
 }
 
-async fn generate_rust_bindings(root_dir: &Path, package_name: &wit_parser::PackageName, interfaces: &[String], rel_wit_path: &Path) -> anyhow::Result<()> {
+async fn generate_rust_bindings(
+    root_dir: &Path,
+    package_name: &wit_parser::PackageName,
+    interfaces: &[String],
+    rel_wit_path: &Path,
+) -> anyhow::Result<()> {
     // now set up the bindings
     let deps_rs_dir = root_dir.join("src/deps");
     fs::create_dir_all(&deps_rs_dir).await?;
     let dep_module_name = crate::language::rust::identifier_safe(package_name);
 
     // step 1: create a module with the generate! macro
-    let imps = interfaces.iter()
+    let imps = interfaces
+        .iter()
         .filter(|itf| !crate::language::rust::is_stdlib_known(itf))
-        .map(|i| format!(r#"        import {i};"#)).collect::<Vec<_>>();
+        .map(|i| format!(r#"        import {i};"#))
+        .collect::<Vec<_>>();
     let imps = imps.join("\n");
-    let gens = interfaces.iter()
+    let gens = interfaces
+        .iter()
         .filter(|itf| !crate::language::rust::is_stdlib_known(itf))
-        .map(|i| if crate::language::rust::is_sdk_known(i) {
+        .map(|i| {
+            if crate::language::rust::is_sdk_known(i) {
                 let (qname, _) = i.split_once("@").unwrap(); // foo:bar/baz
-                let rust_qname = qname.replace(":", "::").replace("/", "::").replace("-", "_");
-                let sdk_form = format!("spin_sdk::wit::{rust_qname}");  // TODO: this doesn't allow for when multiple versions are present!  when that happens, but ONLY when that happens, bindgen version-mangles the name
+                let rust_qname = qname
+                    .replace(":", "::")
+                    .replace("/", "::")
+                    .replace("-", "_");
+                let sdk_form = format!("spin_sdk::wit::{rust_qname}"); // TODO: this doesn't allow for when multiple versions are present!  when that happens, but ONLY when that happens, bindgen version-mangles the name
                 format!(r#"        "{i}": {sdk_form},"#)
             } else {
                 format!(r#"        "{i}": generate,"#)
             }
-        ).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
     let gens = gens.join("\n");
     let gen_name = format!("{}-{}", package_name.namespace, package_name.name);
 
     let binding_file = deps_rs_dir.join(format!("{dep_module_name}.rs"));
     let gen_macro = include_str!("gen.txt")
-        .replace("{!dep_path!}", format!("{}", rel_wit_path.display()).as_str())
+        .replace(
+            "{!dep_path!}",
+            format!("{}", rel_wit_path.display()).as_str(),
+        )
         .replace("{!imps!}", &imps)
         .replace("{!gens!}", &gens)
         .replace("{!gen_name!}", &gen_name);
@@ -447,11 +523,7 @@ async fn generate_rust_bindings(root_dir: &Path, package_name: &wit_parser::Pack
     if existing.contains(&dep_module_decl) {
         // nothing to do. No I am not going to worry about if it is commented out, who do you think I am rust-analyzer
     } else {
-        let separator = if existing.ends_with('\n') {
-            ""
-        } else {
-            ""
-        };
+        let separator = "";
         let new_mod_rs = format!("{existing}{separator}pub {dep_module_decl}\n");
         fs::write(mod_rs_file, new_mod_rs).await?;
     }

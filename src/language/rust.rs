@@ -1,5 +1,9 @@
 pub fn identifier_safe(package_name: &wit_parser::PackageName) -> String {
-    format!("{ns}_{name}", ns = package_name.namespace, name = package_name.name)
+    format!(
+        "{ns}_{name}",
+        ns = package_name.namespace,
+        name = package_name.name
+    )
 }
 
 // TODO: moar
@@ -18,7 +22,7 @@ const STDLIB_INTERFACES: &[&str] = &[
 ];
 
 const SPIN_SDK_INTERFACES: &[&str] = &[
-    "wasi:http/incoming-handler@0.2.0",  // TODO: or maybe this is different again
+    "wasi:http/incoming-handler@0.2.0", // TODO: or maybe this is different again
     "wasi:keyvalue/store@0.2.0-draft2",
     "wasi:keyvalue/batch@0.2.0-draft2",
     "wasi:keyvalue/atomics@0.2.0-draft2",
