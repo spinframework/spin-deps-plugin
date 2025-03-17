@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 
 mod commands;
 mod common;
+mod language;
 use commands::{add::AddCommand, bindings::GenerateBindingsCommand, publish::PublishCommand};
 
 /// Main CLI structure for command-line argument parsing.

@@ -1,14 +1,6 @@
-use std::path::PathBuf;
-
 use anyhow::{Context, Result};
 use wit_component::WitPrinter;
 use wit_parser::{PackageId, Resolve};
-
-pub const DEFAULT_WIT: &str = r#"package spin-deps:deps@0.1.0;
-
-    world deps {
-    }
-"#;
 
 /// Converts a Resolve object to WIT content.
 pub fn resolve_to_wit(resolve: &Resolve, package_id: PackageId) -> Result<String> {
@@ -56,23 +48,23 @@ pub fn get_exported_interfaces(
         .collect()
 }
 
-pub fn merge_dependecy_package(
-    base_resolve_file: Option<&PathBuf>,
-    dependency_resolve: &Resolve,
-    dependency_pkg_id: PackageId,
-) -> Result<(Resolve, PackageId)> {
-    let mut base_resolve = Resolve::default();
-    let base_resolve_pkg_id = match base_resolve_file {
-        Some(path) => base_resolve.push_file(path)?,
-        None => base_resolve.push_str("base_resolve.wit", DEFAULT_WIT)?,
-    };
-    let base_resolve_world_id = base_resolve.select_world(base_resolve_pkg_id, Some("deps"))?;
+// pub fn merge_dependecy_package(
+//     base_resolve_file: Option<&PathBuf>,
+//     dependency_resolve: &Resolve,
+//     dependency_pkg_id: PackageId,
+// ) -> Result<(Resolve, PackageId)> {
+//     let mut base_resolve = Resolve::default();
+//     let base_resolve_pkg_id = match base_resolve_file {
+//         Some(path) => base_resolve.push_file(path)?,
+//         None => base_resolve.push_str("base_resolve.wit", DEFAULT_WIT)?,
+//     };
+//     let base_resolve_world_id = base_resolve.select_world(base_resolve_pkg_id, Some("deps"))?;
 
-    let dependecy_main_world_id =
-        dependency_resolve.select_world(dependency_pkg_id, Some("dependency-world"))?;
-    let remap = base_resolve.merge(dependency_resolve.clone())?;
-    let dependecy_world_id = remap.map_world(dependecy_main_world_id, None)?;
-    base_resolve.merge_worlds(dependecy_world_id, base_resolve_world_id)?;
+//     let dependecy_main_world_id =
+//         dependency_resolve.select_world(dependency_pkg_id, Some("dependency-world"))?;
+//     let remap = base_resolve.merge(dependency_resolve.clone())?;
+//     let dependecy_world_id = remap.map_world(dependecy_main_world_id, None)?;
+//     base_resolve.merge_worlds(dependecy_world_id, base_resolve_world_id)?;
 
-    Ok((base_resolve, base_resolve_pkg_id))
-}
+//     Ok((base_resolve, base_resolve_pkg_id))
+// }

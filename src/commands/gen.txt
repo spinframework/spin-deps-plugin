@@ -1,0 +1,12 @@
+::spin_sdk::wit_bindgen::generate!({
+    inline: r#"
+    package imported:{!gen_name!};
+    world imports {
+{!imps!}
+    }
+    "#,
+    with: {
+{!gens!}
+    },
+    path: "{!dep_path!}",
+});
