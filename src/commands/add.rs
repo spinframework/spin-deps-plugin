@@ -4,7 +4,7 @@ use convert_case::{Case, Casing};
 use http::HttpAddCommand;
 use local::LocalAddCommand;
 use registry::RegistryAddCommand;
-use semver::VersionReq;
+use semver::{Version, VersionReq};
 use spin_manifest::{
     manifest_from_file,
     schema::v2::{AppManifest, ComponentDependency},
@@ -482,17 +482,10 @@ async fn generate_ts_bindings(
         package_name.namespace, package_name.name
     );
 
-    let package_name_str = if let Some(v) = &package_name.version {
-        format!(
-            "@spin-deps/{}-{}@{}",
-            package_name.namespace, package_name.name, v
-        )
-    } else {
-        format!(
-            "@spin-deps/{}-{}",
-            package_name.namespace, package_name.name
-        )
-    };
+    let package_name_str = format!(
+        "@spin-deps/{}-{}",
+        package_name.namespace, package_name.name
+    );
 
     let package_id = resolve
         .packages
@@ -503,12 +496,14 @@ async fn generate_ts_bindings(
 
     let world_id = resolve.select_world(package_id, Some("root"))?;
 
-    let out_world_name = &package_name
-        .to_string()
-        .replace("_", "-")
-        .replace(":", "-")
-        .replace("@", "")
-        .replace("/", "-");
+    let out_world_name = &format!(
+        "importized-{}-{}",
+        package_name.namespace, package_name.name
+    )
+    .replace("_", "-")
+    .replace(":", "-")
+    .replace("@", "")
+    .replace("/", "-");
 
     resolve.importize(world_id, Some(out_world_name.clone()))?;
     let out_world_id = resolve.select_world(package_id, Some(&out_world_name))?;
@@ -519,7 +514,11 @@ async fn generate_ts_bindings(
 
     // add a package.json file
     let package_json = package_dir.join("package.json");
-    let package_json_content = package_json_content(&package_name_str, &out_world_name);
+    let package_json_content = package_json_content(
+        &package_name_str,
+        &out_world_name,
+        package_name.version.clone(),
+    );
     fs::write(&package_json, package_json_content)
         .await
         .context("no package json file")?;
@@ -601,9 +600,6 @@ async fn generate_ts_bindings(
                     final_name, import_path
                 ));
                 re_exports.push(format!("export {{ {} }};", final_name));
-
-                println!("import * as {} from '{}';", final_name, import_path);
-                println!("export {{ {} }};", final_name);
             }
             // TODO: spin deps itself does not importing functions
             wit_parser::WorldItem::Function(_) => {}
@@ -618,7 +614,7 @@ async fn generate_ts_bindings(
     println!(
         "To use the component, run:\ncd {}\n npm install ./{}",
         root_dir.to_string_lossy(),
-        package_name
+        package_name_str
     );
 
     Ok(())
@@ -720,11 +716,14 @@ async fn generate_rust_bindings(
     Ok(())
 }
 
-fn package_json_content(package_name: &str, world: &str) -> String {
+fn package_json_content(package_name: &str, world: &str, version: Option<Version>) -> String {
+    let version_str = version
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "0.1.0".to_owned());
     format!(
         r#"{{
     "name": "{package_name}",
-    "version": "0.1.0",
+    "version": "{version_str}",
     "description": "Generated Package for {package_name}",
     "main": "index.js",
     "scripts": {{
