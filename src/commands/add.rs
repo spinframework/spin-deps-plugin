@@ -731,7 +731,7 @@ fn package_json_content(package_name: &str, world: &str, version: Option<Version
     "author": "",
     "license": "ISC",
     "config": {{
-        "witDeps": 
+        "witDependencies": 
         [
             {{
             "witPath": "./wit",
