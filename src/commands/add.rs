@@ -506,7 +506,7 @@ async fn generate_ts_bindings(
     .replace("/", "-");
 
     resolve.importize(world_id, Some(out_world_name.clone()))?;
-    let out_world_id = resolve.select_world(package_id, Some(&out_world_name))?;
+    let out_world_id = resolve.select_world(package_id, Some(out_world_name))?;
 
     // Create a new directory within the spin component working directory
     let package_dir = root_dir.join(&package_name_str);
@@ -516,7 +516,7 @@ async fn generate_ts_bindings(
     let package_json = package_dir.join("package.json");
     let package_json_content = package_json_content(
         &package_name_str,
-        &out_world_name,
+        out_world_name,
         package_name.version.clone(),
     );
     fs::write(&package_json, package_json_content)
