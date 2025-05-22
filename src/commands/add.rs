@@ -560,16 +560,22 @@ async fn generate_ts_bindings(
         },
     )?;
 
+    let mut reference_types = Vec::new();
+
     for (name, contents) in files.iter() {
         let output_path = package_dir.join("types").join(name);
         // Create parent directories if they don't exist
         if let Some(parent) = output_path.parent() {
             fs::create_dir_all(parent).await?;
         }
+
+        reference_types.push(format!("/// <reference path=\"./types/{name}\" />\n",));
+        println!("Writing {name} to {output_path:?}");
         fs::write(output_path, contents).await?;
     }
     // for all interface names in interfaces, import and re-export them in a index.js file
     let mut re_exports: Vec<String> = Vec::new();
+    re_exports.push(reference_types.join("\n"));
     let mut name_counts: HashMap<String, usize> = HashMap::new();
     for (_, item) in resolve.worlds[out_world_id].imports.iter() {
         match item {
